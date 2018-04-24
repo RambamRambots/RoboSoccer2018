@@ -23,6 +23,8 @@
 #define OLED 0x70
 #define COMPASS 0x70
 
+#define WHITE 29 // > 29
+
 extern "C" {
 #include "utility/twi.h"  // from Wire library, so we can do bus scanning
 }
@@ -173,20 +175,95 @@ void setup() {
 
 }
 
+// Line sensing stuff
+
+#define NONE -1
+
+#define RIGHT 0
+#define LEFT 1
+
+int lastXDir = NONE;
+
+#define FWD 0
+#define BKWD 1
+
+int lastYDir = NONE;
+
+boolean sawLine = false;
+
 void loop() {
   // readAllSensors();
 
+  // Set front
   boolean prevSetFrontPressed = setFrontPressed;
   setFrontPressed = digitalRead(8) == 0;
   if (!prevSetFrontPressed && setFrontPressed) {
     front = readCompass();
   }
+  
+
+  // Read color sensor
+  uint16_t r, g, b, c;
+  tcs.getRawData(&r, &g, &b, &c);
+
+  // Read compass
+  int compOff = getCompOff();
+  int rot = 0;
+  if (compOff > 15) {
+    rot = -50;
+  } else if (compOff < -15) {
+    rot = 50;
+  } else if (compOff > 10) {
+    rot = -25;
+  } else if (compOff < -10) {
+    rot = 25;
+  }
 
   if (soccerMode == OFFENSE) {
-    // I'm a Forward!
+    
+    // TO-DO: Decide where to go
+    int angle = 0;
+    int velocity = 0;
+    
+    float rad  = (angle - 90) * PI / 180;
+    float x = velocity * cos(rad);
+    float y = velocity * sin(rad) * -1;
+
+    if (c > WHITE) {
+      if ((x > 0 && lastXDir == RIGHT) || (x < 0 && lastXDir == LEFT)) {
+        x = 0;
+      }
+      if ((y > 0 && lastYDir == FWD) || (y < 0 && lastYDir == BKWD)) {
+        y = 0;
+      }
+    }
+  
+    if (!sawLine) {
+      if (x == 0 && c <= WHITE) {
+        lastXDir = NONE;
+      } else if (x > 0) {
+        lastXDir = RIGHT;
+      } else if (x < 0) {
+        lastXDir = LEFT;
+      }
+      
+      if (y == 0 && c <= WHITE) {
+        lastYDir = NONE;
+      } else if (y > 0) {
+        lastYDir = FWD;
+      } else if (y < 0) {
+        lastYDir = BKWD;
+      }
+    }
+    drive(x, y, 0);
+    sawLine = c > WHITE;
+    
+    drive((int)x, (int)y, rot);
+    
   } else {
     // I'm a Goalie!
   }
+  
 }
 
 
