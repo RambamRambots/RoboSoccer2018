@@ -23,7 +23,7 @@
 #define OLED 0x70
 #define COMPASS 0x70
 
-#define WHITE 29 // > 29
+#define WHYTE 29 // > 29
 
 extern "C" {
 #include "utility/twi.h"  // from Wire library, so we can do bus scanning
@@ -194,6 +194,8 @@ boolean sawLine = false;
 void loop() {
   // readAllSensors();
 
+  getReading();
+
   // Set front
   boolean prevSetFrontPressed = setFrontPressed;
   setFrontPressed = digitalRead(8) == 0;
@@ -229,7 +231,7 @@ void loop() {
     float x = velocity * cos(rad);
     float y = velocity * sin(rad) * -1;
 
-    if (c > WHITE) {
+    if (c > WHYTE) {
       if ((x > 0 && lastXDir == RIGHT) || (x < 0 && lastXDir == LEFT)) {
         x = 0;
       }
@@ -239,7 +241,7 @@ void loop() {
     }
   
     if (!sawLine) {
-      if (x == 0 && c <= WHITE) {
+      if (x == 0 && c <= WHYTE) {
         lastXDir = NONE;
       } else if (x > 0) {
         lastXDir = RIGHT;
@@ -247,7 +249,7 @@ void loop() {
         lastXDir = LEFT;
       }
       
-      if (y == 0 && c <= WHITE) {
+      if (y == 0 && c <= WHYTE) {
         lastYDir = NONE;
       } else if (y > 0) {
         lastYDir = FWD;

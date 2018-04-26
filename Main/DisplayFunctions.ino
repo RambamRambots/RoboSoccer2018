@@ -7,7 +7,7 @@ boolean initOLED() {
     return true;
 }
 
-void splashScreen(int thyme) {
+void splashScreen(int time) {
   display.clearDisplay();
   display.drawBitmap(0, 0, rambot_logo, 128, 32, 1);
   display.display();

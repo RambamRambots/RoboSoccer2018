@@ -122,8 +122,24 @@ void getReading() {
 
   char buffer[100];
   if (irSensorCount == 4) {
-    sprintf(buffer, "%i,%i,%i,%i,%i,%i,%i,%i\n", reading1, strength1, reading2, strength2, reading3, strength3, reading4, strength4);
+    int strengths[] = { strength1, strength2, strength3, strength4, -1 };
+    int readings[] = { reading1, reading2, reading3, reading4, 6 };
+    int strongest = 0;
+    strongest = strength2 > strengths[strongest] ? 1 : strongest;
+    strongest = strength3 > strengths[strongest] ? 2 : strongest;
+    strongest = strength4 > strengths[strongest] ? 3 : strongest;
+    int centerdest = strength1 > 0 ? 0 : 4;
+    centerdest = abs(reading2) < abs(readings[centerdest]) && strength2 > 0 ? 1 : centerdest;
+    centerdest = abs(reading3) < abs(readings[centerdest]) && strength3 > 0 ? 2 : centerdest;
+    centerdest = abs(reading4) < abs(readings[centerdest]) && strength4 > 0 ? 3 : centerdest;
+    
+    display.clearDisplay();
+    line1(String(centerdest + 1));
+    line2(String(readings[centerdest]));
+    sprintf(buffer, "---------------\n[ %i , %i ]   [ %i , %i ]\n      [ %i : %i, %i ]\n      [ %i : %i, %i ]\n[ %i , %i ]   [ %i , %i ]\n", reading1, strength1, reading2, strength2, strongest + 1, readings[strongest], strengths[strongest], centerdest + 1, readings[centerdest], strengths[centerdest], reading4, strength4, reading3, strength3);
     Serial.print(buffer);
+
+    return readings[centerdest];
   }
 
 }

@@ -1,11 +1,27 @@
 #define COMPASS_DELAY 100
 
 boolean initCompass() {
-  if (!bno.begin()) {
-    Serial.print("Ooops, no BNO055 detected ... Check your wiring or I2C ADDR!");
-    return false;
+  if(!bno.begin()) {
+    Serial.println("No compass found.");
+    while(1);
+  } else {
+    Serial.println("Compass found. Calibrating...");
   }
+  delay(500);
   bno.setExtCrystalUse(true);
+
+  uint8_t system, gyro, accel, mag = 0;
+  char status[5];
+  while(mag != 3) {
+    bno.getCalibration(&system, &gyro, &accel, &mag);
+    sprintf(status,"CAL%i",mag);
+    display.clearDisplay();
+    line1(F("Calibrate Compass"));
+    line2("Status: " + String(status));
+    delay(100);
+  }
+  Serial.println("The compass is set up.");
+  delay(100);
   return true;
 }
 
@@ -80,6 +96,7 @@ void displaySensorOffsets(const adafruit_bno055_offsets_t &calibData)
 
 
 void calibrateCompass(void) {
+  return;
   Serial.println("Orientation Sensor Test"); Serial.println("");
 
   int eeAddress = 0;
@@ -122,17 +139,21 @@ void calibrateCompass(void) {
 
   sensors_event_t event;
   bno.getEvent(&event);
+  uint8_t system, gyro, accel, mag;
+  system = gyro = accel = mag = 0;
+  char message[32];
+  bno.getCalibration(&system, &gyro, &accel, &mag);
   if (foundCalib) {
     Serial.println("Move sensor slightly to calibrate magnetometers");
     line2(F("WIGGLE"));
-    while (!bno.isFullyCalibrated()) {
+    while (system < 3) {
       bno.getEvent(&event);
       delay(COMPASS_DELAY);
     }
   }
   else {
     Serial.println(F("Please Calibrate Sensor: "));
-    while (!bno.isFullyCalibrated()) {
+    while (system < 3) {
       bno.getEvent(&event);
       displayCalStatus();
       Serial.println("");
@@ -165,10 +186,10 @@ void calibrateCompass(void) {
 double readCompass() {
   imu::Vector<3> euler = bno.getVector(Adafruit_BNO055::VECTOR_EULER);
   double heading = euler.x();
-  return heading
+  return heading;
 }
 
-double getCompassOffset() {
+double getCompOff() {
   double offset = readCompass() - front;
   if (offset > 180) {
     offset = 360 - offset;
