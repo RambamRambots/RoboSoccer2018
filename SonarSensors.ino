@@ -1,3 +1,0 @@
-boolean initSonar() {
-    return true;
-}
