@@ -14,7 +14,7 @@
 //-----------
 // PINS
 #define OLED_RESET 6
-#define MODE_PIN 3
+#define MODE_PIN 2
 #define OFFENSE 1
 #define DEFENSE 2
 // I2C addresses
@@ -23,7 +23,7 @@
 #define OLED 0x70
 #define COMPASS 0x70
 
-#define WHYTE 29 // > 29
+#define WHYTE 25
 
 extern "C" {
 #include "utility/twi.h"  // from Wire library, so we can do bus scanning
@@ -34,7 +34,7 @@ extern "C" {
 //----------------
 Adafruit_SSD1306 display(OLED_RESET);
 Adafruit_BNO055 bno = Adafruit_BNO055(55);
-Adafruit_TCS34725 tcs = Adafruit_TCS34725(TCS34725_INTEGRATIONTIME_700MS, TCS34725_GAIN_1X);
+Adafruit_TCS34725 tcs = Adafruit_TCS34725(TCS34725_INTEGRATIONTIME_2_4MS, TCS34725_GAIN_1X);
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
 
 boolean irSensors[4] = {false, false, false, false};
@@ -135,7 +135,7 @@ void setup() {
     line2(F("FAIL"));
     while (1);
   }
-  delay(2000);
+  delay(500);
 
   // Setup Ball Sensor
   display.clearDisplay();
@@ -146,126 +146,203 @@ void setup() {
     line2(F("FAIL"));
     while (1);
   }
-  delay(2000);
+  delay(500);
 
   // Setup Motor Shield
   display.clearDisplay();
   line1(F("Motor Shield"));
   AFMS.begin();
   line2(F("PASS"));
-  delay(2000);
+  delay(500);
 
   // Setup Compass
   display.clearDisplay();
   line1(F("Compass"));
   if (initCompass()) {
+    display.clearDisplay();
+    line1(F("Compass"));
     line2(F("PASS"));
   } else {
+    display.clearDisplay();
+    line1(F("Compass"));
     line2(F("FAIL"));
     while (1);
   }
-  delay(2000);
+  delay(500);
 
   display.clearDisplay();
   calibrateCompass();
 
   // Setup Sonar Sensors
 
-  soccerMode = (digitalRead(MODE_PIN) == HIGH) ? OFFENSE : DEFENSE;
-
 }
 
 // Line sensing stuff
 
-#define NONE -1
+//#define NONE -1
+//
+//#define RIGHT 0
+//#define LEFT 1
+//
+//int lastXDir = NONE;
+//
+//#define FWD 0
+//#define BKWD 1
+//
+//int lastYDir = NONE;
+//
+//boolean sawLine = false;
 
-#define RIGHT 0
-#define LEFT 1
+boolean paused = true;
 
-int lastXDir = NONE;
+void pause() {
+  paused = true;
+  halt();
+}
 
-#define FWD 0
-#define BKWD 1
-
-int lastYDir = NONE;
-
-boolean sawLine = false;
+int lastX = 0;
+int lastY = 0;
 
 void loop() {
-  // readAllSensors();
+  
+  display.clearDisplay();
 
-  getReading();
-
+  soccerMode = (digitalRead(MODE_PIN) == HIGH) ? OFFENSE : DEFENSE;
+  
+  line1(soccerMode == OFFENSE ? "Striker" : "Goalie");
+  
   // Set front
   boolean prevSetFrontPressed = setFrontPressed;
   setFrontPressed = digitalRead(8) == 0;
   if (!prevSetFrontPressed && setFrontPressed) {
     front = readCompass();
+    pause();
   }
   
 
   // Read color sensor
   uint16_t r, g, b, c;
   tcs.getRawData(&r, &g, &b, &c);
-
-  // Read compass
-  int compOff = getCompOff();
-  int rot = 0;
-  if (compOff > 15) {
-    rot = -50;
-  } else if (compOff < -15) {
-    rot = 50;
-  } else if (compOff > 10) {
-    rot = -25;
-  } else if (compOff < -10) {
-    rot = 25;
+//  line3(String(c) + "," + String(r) + "," + String(g) + "," + String(b));
+  if (c > 100 || (digitalRead(10) == 0 && !paused)) {
+    pause();
   }
 
-  if (soccerMode == OFFENSE) {
-    
-    // TO-DO: Decide where to go
-    int angle = 0;
-    int velocity = 0;
-    
-    float rad  = (angle - 90) * PI / 180;
-    float x = velocity * cos(rad);
-    float y = velocity * sin(rad) * -1;
-
-    if (c > WHYTE) {
-      if ((x > 0 && lastXDir == RIGHT) || (x < 0 && lastXDir == LEFT)) {
-        x = 0;
-      }
-      if ((y > 0 && lastYDir == FWD) || (y < 0 && lastYDir == BKWD)) {
-        y = 0;
-      }
-    }
-  
-    if (!sawLine) {
-      if (x == 0 && c <= WHYTE) {
-        lastXDir = NONE;
-      } else if (x > 0) {
-        lastXDir = RIGHT;
-      } else if (x < 0) {
-        lastXDir = LEFT;
-      }
-      
-      if (y == 0 && c <= WHYTE) {
-        lastYDir = NONE;
-      } else if (y > 0) {
-        lastYDir = FWD;
-      } else if (y < 0) {
-        lastYDir = BKWD;
-      }
-    }
-    drive(x, y, 0);
-    sawLine = c > WHITE;
-    
-    drive((int)x, (int)y, rot);
-    
+  if (paused) {
+    line2(F("Paused"));
+    paused = digitalRead(9) == 1;
   } else {
-    // I'm a Goalie!
-  }
+
+    int angle = getReading(false);
+    int power = getReading(true);
+    line2(String(power));
+    line3(String(angle));
+      
+    float rad  = (angle - 90) * PI / 180;
+    float bx = 100 * cos(rad);
+    float by = 100 * sin(rad) * -1;
+
+    // Read compass
+    double compOff = getCompOff();
+    int rot = abs(compOff) > 9 ? (int)(-5 * compOff) : 0;
+    rot = rot > 100 ? 100 : rot;
+    rot = rot < -100 ? -100 : rot;
+    
+    if (soccerMode == OFFENSE) {
+
+      if (c > WHYTE) {
+        drive(-lastX, -lastY, 0);
+        delay(700);
+        return;
+      }
   
+  //    if (c > WHYTE) {
+  //      if ((x > 0 && lastXDir == RIGHT) || (x < 0 && lastXDir == LEFT)) {
+  //        x = 0;
+  //      }
+  //      if ((y > 0 && lastYDir == FWD) || (y < 0 && lastYDir == BKWD)) {
+  //        y = 0;
+  //      }
+  //    }
+    
+  //    if (!sawLine) {
+  //      if (x == 0 && c <= WHYTE) {
+  //        lastXDir = NONE;
+  //      } else if (x > 0) {
+  //        lastXDir = RIGHT;
+  //      } else if (x < 0) {
+  //        lastXDir = LEFT;
+  //      }
+  //      
+  //      if (y == 0 && c <= WHYTE) {
+  //        lastYDir = NONE;
+  //      } else if (y > 0) {
+  //        lastYDir = FWD;
+  //      } else if (y < 0) {
+  //        lastYDir = BKWD;
+  //      }
+  //    }
+
+      int x = 0;
+      int y = 0;
+  
+      if (abs(angle) < 45 || power < 6) {
+        x = bx;
+        y = by;
+      } else if (abs(angle) < 60) {
+        x = bx;
+        y = by * 0.4;
+      } else if (angle < 90 && angle > 0) {
+        x = 75;
+        y = -75;
+      } else if (angle > -90 && angle < 0) {
+        x = -75;
+        y = -75;
+      } else if (abs(angle) < 110) {
+        x = 0;
+        y = -100;
+      } else if (angle <= 135 && angle > 0) {
+        x = -35;
+        y = -100;
+      } else if (angle >= -135 && angle < 0) {
+        x = 35;
+        y = -100;
+      } else if (angle <= 180 && angle > 0) {
+        x = -60;
+        y = -50;
+      } else if (angle >= -180 && angle < 0) {
+        x = 60;
+        y = -50;
+      }
+
+      drive(x, y, rot);
+
+      lastX = x;
+      lastY = y;
+      
+//      sawLine = c > WHYTE;
+      
+    } else {
+      if (angle > 9 && angle <= 90) {
+        int x = (int)min(bx * 2, 100);
+        drive(x, 0, rot);
+          line2(String(x));
+      } else if (angle < -9 && angle >= -90) {
+        int x = (int)max(bx * 2, -100);
+        drive(x, 0, rot);
+          line2(String(x));
+      } else if (angle == 0 && power > 17) {
+        drive(0, 100, 0);
+        delay(500);
+        halt();
+        delay(100);
+        drive(0, -100, 0);
+        delay(500);
+      } else {
+        halt();
+      }
+    }
+  }
 }
 
 

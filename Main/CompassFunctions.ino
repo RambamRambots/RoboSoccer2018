@@ -186,13 +186,18 @@ void calibrateCompass(void) {
 double readCompass() {
   imu::Vector<3> euler = bno.getVector(Adafruit_BNO055::VECTOR_EULER);
   double heading = euler.x();
+//  line3(String(heading));
   return heading;
 }
 
 double getCompOff() {
   double offset = readCompass() - front;
   if (offset > 180) {
-    offset = 360 - offset;
+    offset -= 360;
+  } else if (offset < -180) {
+    offset += 360;
   }
+//  line2(String(offset));
+  return offset;
 }
 
